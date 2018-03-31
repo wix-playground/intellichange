@@ -16,8 +16,9 @@ feature eliminates the need to think about it, just press `Enter`.
 
   1. > git clone git@github.com:wix-playground/intellichange.git
   2. > cd intellichange
-  3. > msce package
+  3. > npm install
+  4. > msce package
 
-Or, if you are from Wix, [download](https://drive.google.com/open?id=1xDFJ1qt63NpvS0aekQSKBCGhh9qmXlli) extension file instead of steps 1.-3.
+Or, if you are from Wix, [download](https://drive.google.com/open?id=1xDFJ1qt63NpvS0aekQSKBCGhh9qmXlli) extension file instead of steps 1.-4.
 
-  4. > code --install-extension intellichange-0.0.1.vsix
+  5. > code --install-extension intellichange-0.0.1.vsix
