@@ -34,4 +34,7 @@ way.) Works only with option `"editor.autoClosingBrackets" : true`.
 
 Or, if you are from Wix, [download](https://drive.google.com/open?id=1AyvATOVDdbAPjBItF9tXTqWdjkFq1JsD) extension file instead of steps 1.-5.
 
-  5. > code --install-extension intellichange-0.0.3.vsix
+  6. > code --install-extension intellichange-0.0.3.vsix
+
+If `code` is not in your path, fix it [for MacOS](https://code.visualstudio.com/docs/setup/mac#_launching-from-the-command-line) inside Code
+or reinstall [for Windows](https://code.visualstudio.com/docs/setup/windows)
