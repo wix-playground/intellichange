@@ -32,8 +32,10 @@ export default function eraseTouchingWhitespaceAfterEnter(event: vscode.TextDocu
     };
 
     return async () => {
-        editor.edit(eraseTouchingWhitespace);
-    }
+        if (oldLineWhitespace || newLineWhitespace) {
+            editor.edit(eraseTouchingWhitespace);
+        }
+    };
 }
 
 function detectEnterKeyPress(event: vscode.TextDocumentChangeEvent) {
