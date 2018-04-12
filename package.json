@@ -2,7 +2,7 @@
     "name": "intellichange",
     "displayName": "IntelliChange",
     "description": "Handy editor improvements",
-    "version": "0.0.2",
+    "version": "0.0.3",
     "publisher": "Wix",
     "engines": {
         "vscode": "^1.21.0"
