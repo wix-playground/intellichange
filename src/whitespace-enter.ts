@@ -1,8 +1,13 @@
 'use strict';
 import * as vscode from 'vscode';
-import log from './log';
+import {TextSelection} from './core/TextSelection';
+import log from './core/log';
 
-export default function eraseTouchingWhitespaceAfterEnter(event: vscode.TextDocumentChangeEvent, editor: vscode.TextEditor) {
+export default function eraseTouchingWhitespaceAfterEnter(
+    event: vscode.TextDocumentChangeEvent,
+    editor: vscode.TextEditor,
+    activeSelection?: TextSelection
+) {
     const changesCausedByEnter = detectEnterKeyPress(event);
     if (!changesCausedByEnter) {
         return;

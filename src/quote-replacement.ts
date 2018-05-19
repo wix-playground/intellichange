@@ -1,97 +1,83 @@
 'use strict';
 import * as vscode from 'vscode';
-import log from './log';
+import {TextSelection} from './core/TextSelection';
+import {findPairedWrappingQuote, transformQuoteEscaping, extractStringLiteralText, stringLiteralRange, QUOTES} from './core/string-literal';
+import log from './core/log';
 
-const QUOTES = ['\'', '"', '`'];
-const ESCAPE = '\\';
-
-export default function replaceQuoteInsteadOfSurroundingWithNewQuotes(event: vscode.TextDocumentChangeEvent, editor: vscode.TextEditor) {
+export default function replaceQuoteInsteadOfSurroundingWithNewQuotes(
+    event: vscode.TextDocumentChangeEvent,
+    editor: vscode.TextEditor,
+    activeSelection?: TextSelection
+) {
     let wrapping = detectWrappingQuoteInOtherQuotes(event, editor);
-    if (!wrapping) {
-        return;
-    }
-
-    const wrapped = wrapping.wrappedQuote;
-    const line = wrapping.opening.line;
-    const wrappingEnd = wrapping.closing.translate(0, 1);
-    const originalLine =
-        editor.document.getText(new vscode.Range(line, 0, line, wrapping.opening.character)) +
-        wrapped +
-        editor.document.getText(new vscode.Range(line, wrappingEnd.character, line, Infinity));
-
-    const pairedQuote = findPairedWrappingQuote(originalLine, wrapping.opening.character);
-    const pairedIsClosing = pairedQuote ? pairedQuote > wrapping.opening.character : false;
-    let fullStringReplacement: {range: vscode.Range, text: string} | null = null;
-    let newSelection: vscode.Selection | null = null;
-    
-    if (pairedQuote) {
-        const stringStart = pairedIsClosing ? wrapping.opening.character + 1 : pairedQuote + 1;
-        const stringEnd = pairedIsClosing ? pairedQuote : wrapping.opening.character;
-        const stringText = originalLine.substring(stringStart, stringEnd);
-        const fixedText = fixQuoteEscaping(stringText, wrapping.insertedQuote);
-        const w = wrapped;
-        const q = wrapping.insertedQuote;
-        log(`transforming ${w}${stringText}${w} to ${q}${fixedText}${q}`);
-
-        if (fixedText) {
-            const start = pairedIsClosing ? wrapping.opening : new vscode.Position(line, pairedQuote);
-            const endIndex = pairedIsClosing ? pairedQuote + 3 : wrapping.closing.character + 1;
-            fullStringReplacement = {
-                range: new vscode.Range(start, new vscode.Position(line, endIndex)),
-                text: `${q}${fixedText}${q}`
-            }
-            const offset = pairedIsClosing ? 0 : fixedText.length - stringText.length;
-            newSelection = new vscode.Selection(
-                wrapping.opening.translate(0, offset),
-                wrapping.opening.translate(0, offset + 1));
-        } else {
-            newSelection = new vscode.Selection(wrapping.opening, wrapping.opening.translate(0, 1));
-        }
-    }
-
-    const replaceQuotes = (editBuilder: vscode.TextEditorEdit) => {
-        if (fullStringReplacement) {
-            editBuilder.replace(fullStringReplacement.range, fullStringReplacement.text);
-        } else if (wrapping) {
-            const wrappingRange = new vscode.Range(wrapping.opening, wrappingEnd);
-            editBuilder.replace(wrappingRange, wrapping.insertedQuote);
-            if (pairedQuote) {
-                const offset = pairedIsClosing ? 2 : 0;
-                const range = new vscode.Range(line, pairedQuote + offset, line, pairedQuote + offset + 1);
-                editBuilder.replace(range, wrapping.insertedQuote);
-            }
-        }
-    };
-
-    return async () => {
-        const replacement = editor.edit(replaceQuotes);
-    
-        if (newSelection) {
-            await replacement;
-            editor.selection = newSelection;
-        }
+    if (wrapping) {
+        return generateFix(editor, wrapping);
     }
 }
 
+function generateFix(editor: vscode.TextEditor, wrapping: any) {
+    const line = wrapping.opening.line;
+    const originalLine =
+        editor.document.getText(new vscode.Range(line, 0, line, wrapping.opening.character)) +
+        wrapping.wrappedQuote +
+        editor.document.getText(new vscode.Range(line, wrapping.closing.character + 1, line, Infinity));
+
+    const pairedQuote = findPairedWrappingQuote(originalLine, wrapping.opening.character);
+
+    if (pairedQuote) {
+      return generateStringLiteralFix(editor, originalLine, pairedQuote, wrapping);
+    } else {
+      return generateIsolatedFix(editor, wrapping);
+    }
+}
+
+function generateStringLiteralFix(editor: vscode.TextEditor, originalLine: string, pairedQuote: number, {wrappedQuote, insertedQuote, opening}: any) {
+    const stringText = extractStringLiteralText(originalLine, opening.character, pairedQuote);
+    const fixedText = transformQuoteEscaping(stringText, insertedQuote);
+    log(`transforming ${wrappedQuote}${stringText}${wrappedQuote} to ${insertedQuote}${fixedText}${insertedQuote}`);
+
+    const replaceString = (editBuilder: vscode.TextEditorEdit) => {
+        const rangeInOriginalLine = stringLiteralRange(opening.line, opening.character, pairedQuote);
+        const rangeInCurrentLine = rangeInOriginalLine.with(undefined, rangeInOriginalLine.end.translate(0, 2));
+        editBuilder.replace(rangeInCurrentLine, `${insertedQuote}${fixedText}${insertedQuote}`);
+    };
+
+    return async () => {
+        await editor.edit(replaceString);
+        editor.selection = new vscode.Selection(opening, opening.translate(0, 1));
+    };
+}
+
+function generateIsolatedFix(editor: vscode.TextEditor, {opening, insertedQuote, closing}: any) {
+    const unwrap = (editBuilder: vscode.TextEditorEdit) => {
+        const range = new vscode.Range(opening, closing.translate(0, 1));
+        editBuilder.replace(range, insertedQuote);
+    };
+
+    return async () => {
+        editor.edit(unwrap);
+    };
+}
+
 function detectWrappingQuoteInOtherQuotes(event: vscode.TextDocumentChangeEvent, editor: vscode.TextEditor) {
-    if (event.contentChanges.length != 2) {
+    if (event.contentChanges.length !== 2) {
         log(`abort - made ${event.contentChanges.length} changes`);
         return;
     }
 
     const first = event.contentChanges[0];
     const second = event.contentChanges[1];
-    if (first.text != second.text) {
+    if (first.text !== second.text) {
         log(`abort - inserted texts do not match`);
         return;
     }
 
-    if (QUOTES.indexOf(first.text) == -1) {
+    if (QUOTES.indexOf(first.text) === -1) {
         log(`abort - '${first.text}' is not a quote`);
         return;
     }
 
-    if (first.rangeLength != 0 || second.rangeLength != 0) {
+    if (first.rangeLength !== 0 || second.rangeLength !== 0) {
         log(`abort - some text was replaced`);
         return;
     }
@@ -115,7 +101,7 @@ function detectWrappingQuoteInOtherQuotes(event: vscode.TextDocumentChangeEvent,
         end = new vscode.Position(second.range.start.line, insertion2);
     }
 
-    if (wrappedCharacterCount != 1) {
+    if (wrappedCharacterCount !== 1) {
         log(`abort - wrapped ${wrappedCharacterCount} characters`);
         return;
     }
@@ -123,7 +109,7 @@ function detectWrappingQuoteInOtherQuotes(event: vscode.TextDocumentChangeEvent,
     const wrappedStart = start.translate(0, 1);
     const wrapped = editor.document.getText(new vscode.Range(wrappedStart, end));
 
-    if (QUOTES.indexOf(wrapped) == -1) {
+    if (QUOTES.indexOf(wrapped) === -1) {
         log(`abort - wrapped '${wrapped}' is not a quote`);
         return;
     }
@@ -137,71 +123,4 @@ function detectWrappingQuoteInOtherQuotes(event: vscode.TextDocumentChangeEvent,
 
     log(`single quote wrapped in quotes ${JSON.stringify(result)}`);
     return result;
-}
-
-function findPairedWrappingQuote(text: string, position: number) {
-    let wrappingQuote = null;
-    let wrappingStart = null;
-    let isEscaped = false;
-    for (let index = 0; index < text.length; index++) {
-        if (wrappingQuote) {
-            if (isEscaped) {
-                if (index == position) {
-                    return undefined;
-                } else {
-                    isEscaped = false;
-                    continue;
-                }
-            }
-            const foundClosingQuote = wrappingQuote == text[index];
-            if (index == position) {
-                return foundClosingQuote ? wrappingStart : undefined;
-            } else if (foundClosingQuote) {
-                if (wrappingStart == position) {
-                    return index;
-                }
-                wrappingQuote = null;
-                wrappingStart = null;
-            } else if (ESCAPE == text[index]) {
-                isEscaped = true;
-            }
-        } else if (QUOTES.indexOf(text[index]) != -1) {
-            wrappingQuote = text[index];
-            wrappingStart = index;
-        }
-    }
-    return undefined;
-}
-
-function fixQuoteEscaping(text: string, wrappingQuote: string): string | null {
-    let isEscaped = false;
-    let fixed = null;
-    for (let i = 0; i < text.length; i++) {
-        const symbol = text[i];
-        if (ESCAPE == symbol) {
-            isEscaped = !isEscaped;
-        } else {
-            if (QUOTES.indexOf(symbol) != -1) {
-                const needsEscaping = symbol == wrappingQuote;
-                const needsChanges = isEscaped != needsEscaping;
-                if (needsChanges) {
-                    if (fixed == null) {
-                        fixed = text.substring(0, i);
-                    }
-                    if (needsEscaping) {
-                        fixed += ESCAPE;
-                    } else {
-                        fixed = fixed.substring(0, fixed.length - 1);
-                    }
-                }
-            }
-            isEscaped = false;
-        }
-
-        if (fixed) {
-            fixed += symbol;
-        }
-    }
-
-    return fixed;
 }
