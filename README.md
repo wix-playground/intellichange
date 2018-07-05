@@ -19,7 +19,7 @@ After user selects a quote in editor and presses a key for new quote
 VS Code by default surrounds the old quote with new quotes. This feature
 makes it instead replace old quote with the new quote and also finds
 matching quote and replaces it too (fixing any quote escaping along the
-way.) Works only with option `"editor.autoClosingBrackets" : true`.
+way.)
 
 ![Preview for replacing quotes with other quotes](images/quote-replacement.gif)
 
@@ -32,9 +32,9 @@ way.) Works only with option `"editor.autoClosingBrackets" : true`.
   4. > npm install -g vsce
   5. > vsce package
 
-Or, if you are from Wix, [download](https://drive.google.com/open?id=1AyvATOVDdbAPjBItF9tXTqWdjkFq1JsD) extension file instead of steps 1.-5.
+Or, if you are from Wix, [download](https://drive.google.com/open?id=1GC87wIarHmMfFUv52BfYeyeB0N0SCptf) extension file instead of steps 1.-5.
 
-  6. > code --install-extension intellichange-0.0.3.vsix
+  6. > code --install-extension intellichange-0.0.4.vsix
 
 If `code` is not in your path, fix it [for MacOS](https://code.visualstudio.com/docs/setup/mac#_launching-from-the-command-line) inside Code
 or reinstall [for Windows](https://code.visualstudio.com/docs/setup/windows)
